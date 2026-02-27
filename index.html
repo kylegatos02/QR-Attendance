@@ -22,17 +22,21 @@ function onScanSuccess(decodedText) {
 
   showResult("Checking...", "approved");
 
-  fetch(webAppUrl + "?id=" + decodedText)
+let parts = decodedText.split("|");
+let scannedId = parts[0];
+let scannedName = parts[1] || "";
+
+fetch(webAppUrl + "?id=" + scannedId)
     .then(response => response.text())
     .then(result => {
 
       console.log("Server Response:", result);
 
       if (result.includes("APPROVED")) {
-        showResult("✅ APPROVED", "approved");
+        showResult("✅ APPROVED<br>" + scannedName, "approved");
       }
       else if (result.includes("ALREADY_SCANNED")) {
-        showResult("⚠ ALREADY SCANNED", "error");
+        showResult("⚠ ALREADY SCANNED<br>" + scannedName, "error");
       }
       else if (result.includes("NOT_FOUND")) {
         showResult("❌ ID NOT FOUND", "error");
