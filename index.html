@@ -4,23 +4,23 @@
   <meta charset="UTF-8">
   <title>QR Code Scanner</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <style>
     body {
       margin: 0;
       font-family: Arial, sans-serif;
       display: flex;
       flex-direction: column;
-      justify-content: flex-start;
       align-items: center;
-      height: 100vh;
+      justify-content: flex-start;
       background-color: #f4f4f4;
       text-align: center;
+      height: 100vh;
+      padding: 10px;
     }
 
     h1 {
-      margin: 10px 0;
       font-size: 24px;
+      margin: 10px 0;
       color: #333;
     }
 
@@ -28,7 +28,7 @@
       position: relative;
       width: 90vw;
       max-width: 500px;
-      aspect-ratio: 1 / 1; /* Square container */
+      aspect-ratio: 1 / 1; /* square camera area */
       margin: 10px auto;
       border-radius: 15px;
       overflow: hidden;
@@ -64,24 +64,22 @@
       max-width: 400px;
       margin-top: 15px;
       font-weight: bold;
+      line-height: 1.4;
+      word-wrap: break-word;
+      font-size: 24px;
     }
 
-    /* Approved style */
     .approved {
       background-color: #d4edda;
       color: #155724;
-      font-size: 24px;
-      line-height: 1.4;
     }
 
-    /* Error style */
     .error {
       background-color: #f8d7da;
       color: #721c24;
-      font-size: 20px;
-      line-height: 1.4;
     }
 
+    /* Optional: add status and name lines */
     .status {
       font-size: 28px;
       font-weight: bold;
@@ -97,6 +95,10 @@
       h1 {
         font-size: 20px;
       }
+      #resultBox {
+        font-size: 20px;
+        padding: 15px;
+      }
       .status {
         font-size: 24px;
       }
@@ -108,88 +110,89 @@
 </head>
 <body>
 
-  <h1>QR Code Scanner</h1>
+<h1>QR Code Scanner</h1>
 
-  <!-- Scanner -->
-  <div id="scanner-container">
-    <div id="reader"></div>
-    <div id="overlay"></div>
-  </div>
+<div id="scanner-container">
+  <div id="reader"></div>
+  <div id="overlay"></div>
+</div>
 
-  <!-- Result Box -->
-  <div id="resultBox"></div>
+<div id="resultBox"></div>
 
-  <!-- QR Code library -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
 
-  <script>
-    const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec"; 
-    let isProcessing = false;
+<script>
+const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec";
+let isProcessing = false;
 
-    function showResult(statusText, studentName, type) {
-      const box = document.getElementById("resultBox");
-      box.className = "";
-      box.classList.add(type);
+function showResult(message, type) {
+  const box = document.getElementById("resultBox");
+  box.className = "";
+  box.classList.add(type);
+  // Split message into lines for status and name
+  const lines = message.split("\n");
+  box.innerHTML = `<div class="status">${lines[0]}</div>` + (lines[1] ? `<div class="student-name">${lines[1]}</div>` : "");
+  box.style.display = "block";
 
-      box.innerHTML = `
-        <div class="status">${statusText}</div>
-        <div class="student-name">${studentName}</div>
-      `;
+  setTimeout(() => {
+    box.style.display = "none";
+  }, 3000);
+}
 
-      box.style.display = "block";
+function onScanSuccess(decodedText) {
+  if (isProcessing) return;
+  isProcessing = true;
+
+  showResult("Checking...", "approved");
+
+  fetch(webAppUrl + "?id=" + decodedText)
+    .then(response => response.text())
+    .then(result => {
+      console.log("Server Response:", result);
+
+      if (result.includes("APPROVED")) {
+        showResult("✅ APPROVED!", "approved");
+      }
+      else if (result.includes("ALREADY_SCANNED")) {
+        showResult("⚠ ALREADY SCANNED", "error");
+      }
+      else if (result.includes("NOT_FOUND")) {
+        showResult("❌ ID NOT FOUND", "error");
+      }
+      else if (result.includes("ERROR")) {
+        showResult("⚠ SYSTEM ERROR", "error");
+      }
+      else {
+        showResult("⚠ UNKNOWN RESPONSE", "error");
+      }
 
       setTimeout(() => {
-        box.style.display = "none";
-      }, 3000);
-    }
+        isProcessing = false;
+      }, 1500);
 
-    function onScanSuccess(decodedText) {
-      if (isProcessing) return;
-      isProcessing = true;
-
-      showResult("Checking...", "", "approved");
-
-      fetch(webAppUrl + "?id=" + encodeURIComponent(decodedText))
-        .then(response => response.json())
-        .then(data => {
-          const studentName = data.name || "Unknown";
-
-          if (data.status === "APPROVED") showResult("APPROVED!", studentName, "approved");
-          else if (data.status === "ALREADY_SCANNED") showResult("ALREADY SCANNED", studentName, "error");
-          else if (data.status === "NOT_FOUND") showResult("ID NOT FOUND", studentName, "error");
-          else if (data.status === "ERROR") showResult("SYSTEM ERROR", studentName, "error");
-          else showResult("UNKNOWN RESPONSE", studentName, "error");
-
-          setTimeout(() => { isProcessing = false; }, 1500);
-        })
-        .catch(error => {
-          console.error("Fetch error:", error);
-          showResult("CONNECTION ERROR", "", "error");
-          isProcessing = false;
-        });
-    }
-
-    function onScanFailure(error) {
-      // ignore scan failures
-    }
-
-    window.addEventListener('DOMContentLoaded', () => {
-      const html5QrCode = new Html5Qrcode("reader");
-      Html5Qrcode.getCameras().then(devices => {
-        if (devices && devices.length) {
-          html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 20, qrbox: { width: 250, height: 250 } },
-            onScanSuccess,
-            onScanFailure
-          );
-        } else showResult("No camera found", "", "error");
-      }).catch(err => {
-        console.error("Camera error:", err);
-        showResult("Camera error", "", "error");
-      });
+    })
+    .catch(error => {
+      console.error("Fetch error:", error);
+      showResult("⚠ CONNECTION ERROR", "error");
+      isProcessing = false;
     });
-  </script>
+}
+
+function onScanFailure(error) {}
+
+const html5QrCode = new Html5Qrcode("reader");
+
+Html5Qrcode.getCameras().then(devices => {
+  if (devices && devices.length) {
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 20, qrbox: 250 },
+      onScanSuccess,
+      onScanFailure
+    );
+  }
+});
+</script>
 
 </body>
 </html>
