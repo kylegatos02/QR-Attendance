@@ -4,17 +4,35 @@
   <meta charset="UTF-8">
   <title>QR Code Scanner</title>
   <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    #nameInput {
+      padding: 10px;
+      width: 200px;
+      font-size: 16px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
     #reader {
-      width: 300px;
-      margin: 20px auto;
+      width: 500px; /* bigger QR reader */
+      height: 500px;
+      margin: 0 auto 20px auto;
     }
     #resultBox {
       display: none;
       text-align: center;
       padding: 10px;
-      margin-top: 10px;
       font-weight: bold;
       border-radius: 5px;
+      width: 300px;
+      margin: 0 auto;
     }
     .approved {
       background-color: #d4edda;
@@ -27,6 +45,12 @@
   </style>
 </head>
 <body>
+
+  <h1>QR Code Scanner</h1>
+
+  <!-- Name input -->
+  <input type="text" id="nameInput" placeholder="Enter your name">
+
   <!-- QR Code Reader -->
   <div id="reader"></div>
 
@@ -37,7 +61,6 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <script>
-    // Replace this with your Google Apps Script Web App URL
     const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec"; 
     let isProcessing = false;
 
@@ -57,23 +80,24 @@
       if (isProcessing) return;
       isProcessing = true;
 
-      showResult("Checking...", "approved");
+      const name = document.getElementById("nameInput").value || "Unknown";
+      showResult(`Checking for ${name}...`, "approved");
 
-      fetch(webAppUrl + "?id=" + decodedText)
+      fetch(webAppUrl + "?id=" + decodedText + "&name=" + encodeURIComponent(name))
         .then(response => response.text())
         .then(result => {
           console.log("Server Response:", result);
 
           if (result.includes("APPROVED")) {
-            showResult("✅ APPROVED", "approved");
+            showResult(`✅ ${name} APPROVED`, "approved");
           } else if (result.includes("ALREADY_SCANNED")) {
-            showResult("⚠ ALREADY SCANNED", "error");
+            showResult(`⚠ ${name} ALREADY SCANNED`, "error");
           } else if (result.includes("NOT_FOUND")) {
-            showResult("❌ ID NOT FOUND", "error");
+            showResult(`❌ ${name} ID NOT FOUND`, "error");
           } else if (result.includes("ERROR")) {
-            showResult("⚠ SYSTEM ERROR", "error");
+            showResult(`⚠ SYSTEM ERROR`, "error");
           } else {
-            showResult("⚠ UNKNOWN RESPONSE", "error");
+            showResult(`⚠ UNKNOWN RESPONSE`, "error");
           }
 
           setTimeout(() => {
@@ -97,7 +121,7 @@
         if (devices && devices.length) {
           html5QrCode.start(
             { facingMode: "environment" },
-            { fps: 20, qrbox: 250 },
+            { fps: 20, qrbox: 400 }, // QR box bigger
             onScanSuccess,
             onScanFailure
           );
@@ -110,5 +134,6 @@
       });
     });
   </script>
+
 </body>
 </html>
