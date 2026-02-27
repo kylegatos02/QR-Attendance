@@ -42,7 +42,6 @@
       object-fit: cover;
     }
 
-    /* Highlight scanning area in the middle */
     #overlay {
       position: absolute;
       top: 0;
@@ -59,31 +58,50 @@
     #resultBox {
       display: none;
       text-align: center;
-      padding: 15px;
-      font-weight: bold;
-      border-radius: 8px;
+      padding: 20px;
+      border-radius: 12px;
       width: 90%;
       max-width: 400px;
       margin-top: 15px;
-      font-size: 18px;
+      font-weight: bold;
     }
 
+    /* Approved style */
     .approved {
       background-color: #d4edda;
       color: #155724;
+      font-size: 24px;
+      line-height: 1.4;
     }
 
+    /* Error style */
     .error {
       background-color: #f8d7da;
       color: #721c24;
+      font-size: 20px;
+      line-height: 1.4;
+    }
+
+    .status {
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .student-name {
+      font-size: 32px;
+      margin-top: 5px;
+      text-transform: uppercase;
     }
 
     @media (max-width: 400px) {
       h1 {
         font-size: 20px;
       }
-      #resultBox {
-        font-size: 16px;
+      .status {
+        font-size: 24px;
+      }
+      .student-name {
+        font-size: 26px;
       }
     }
   </style>
@@ -108,44 +126,51 @@
     const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec"; 
     let isProcessing = false;
 
-    function showResult(message, type) {
+    function showResult(statusText, studentName, type) {
       const box = document.getElementById("resultBox");
       box.className = "";
       box.classList.add(type);
-      box.innerHTML = message;
+
+      box.innerHTML = `
+        <div class="status">${statusText}</div>
+        <div class="student-name">${studentName}</div>
+      `;
+
       box.style.display = "block";
 
-      setTimeout(() => { box.style.display = "none"; }, 3000);
+      setTimeout(() => {
+        box.style.display = "none";
+      }, 3000);
     }
 
     function onScanSuccess(decodedText) {
       if (isProcessing) return;
       isProcessing = true;
 
-      showResult(`Checking student ID ${decodedText}...`, "approved");
+      showResult("Checking...", "", "approved");
 
       fetch(webAppUrl + "?id=" + encodeURIComponent(decodedText))
         .then(response => response.json())
         .then(data => {
           const studentName = data.name || "Unknown";
 
-          if (data.status === "APPROVED") showResult(`✅ ${studentName} APPROVED`, "approved");
-          else if (data.status === "ALREADY_SCANNED") showResult(`⚠ ${studentName} ALREADY SCANNED`, "error");
-          else if (data.status === "NOT_FOUND") showResult(`❌ ${studentName} ID NOT FOUND`, "error");
-          else if (data.status === "ERROR") showResult(`⚠ SYSTEM ERROR`, "error");
-          else showResult(`⚠ UNKNOWN RESPONSE`, "error");
+          if (data.status === "APPROVED") showResult("APPROVED!", studentName, "approved");
+          else if (data.status === "ALREADY_SCANNED") showResult("ALREADY SCANNED", studentName, "error");
+          else if (data.status === "NOT_FOUND") showResult("ID NOT FOUND", studentName, "error");
+          else if (data.status === "ERROR") showResult("SYSTEM ERROR", studentName, "error");
+          else showResult("UNKNOWN RESPONSE", studentName, "error");
 
           setTimeout(() => { isProcessing = false; }, 1500);
         })
         .catch(error => {
           console.error("Fetch error:", error);
-          showResult("⚠ CONNECTION ERROR", "error");
+          showResult("CONNECTION ERROR", "", "error");
           isProcessing = false;
         });
     }
 
     function onScanFailure(error) {
-      // ignore failures
+      // ignore scan failures
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -154,14 +179,14 @@
         if (devices && devices.length) {
           html5QrCode.start(
             { facingMode: "environment" },
-            { fps: 20, qrbox: { width: 250, height: 250 } }, // center QR box
+            { fps: 20, qrbox: { width: 250, height: 250 } },
             onScanSuccess,
             onScanFailure
           );
-        } else showResult("⚠ No camera found", "error");
+        } else showResult("No camera found", "", "error");
       }).catch(err => {
         console.error("Camera error:", err);
-        showResult("⚠ Camera error", "error");
+        showResult("Camera error", "", "error");
       });
     });
   </script>
