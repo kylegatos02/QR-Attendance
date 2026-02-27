@@ -1,57 +1,6 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Event QR Scanner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
-  <style>
-    body {
-      text-align: center;
-      font-family: Arial, sans-serif;
-      background: #f2f2f2;
-    }
-
-    h2 {
-      margin-top: 15px;
-    }
-
-    #reader {
-      width: 300px;
-      margin: 20px auto;
-    }
-
-    #resultBox {
-      margin-top: 15px;
-      padding: 15px;
-      font-size: 18px;
-      font-weight: bold;
-      border-radius: 8px;
-      display: none;
-    }
-
-    .approved {
-      background: #28a745;
-      color: white;
-    }
-
-    .error {
-      background: #dc3545;
-      color: white;
-    }
-  </style>
-</head>
-<body>
-
-<h2>Scan QR Code</h2>
-
-<div id="reader"></div>
-<div id="resultBox"></div>
-
 <script>
 
-const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec"; 
-
+const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec";
 let isProcessing = false;
 
 function showResult(message, type) {
@@ -71,18 +20,28 @@ function onScanSuccess(decodedText) {
   if (isProcessing) return;
   isProcessing = true;
 
+  showResult("Checking...", "approved");
+
   fetch(webAppUrl + "?id=" + decodedText)
     .then(response => response.text())
     .then(result => {
 
+      console.log("Server Response:", result);
+
       if (result.includes("APPROVED")) {
         showResult("✅ APPROVED", "approved");
-      } 
+      }
       else if (result.includes("ALREADY_SCANNED")) {
-        showResult("⚠ Already Scanned", "error");
-      } 
-      else {
+        showResult("⚠ ALREADY SCANNED", "error");
+      }
+      else if (result.includes("NOT_FOUND")) {
         showResult("❌ ID NOT FOUND", "error");
+      }
+      else if (result.includes("ERROR")) {
+        showResult("⚠ SYSTEM ERROR", "error");
+      }
+      else {
+        showResult("⚠ UNKNOWN RESPONSE", "error");
       }
 
       setTimeout(() => {
@@ -91,7 +50,8 @@ function onScanSuccess(decodedText) {
 
     })
     .catch(error => {
-      showResult("Server Error", "error");
+      console.error("Fetch error:", error);
+      showResult("⚠ CONNECTION ERROR", "error");
       isProcessing = false;
     });
 }
@@ -112,6 +72,3 @@ Html5Qrcode.getCameras().then(devices => {
 });
 
 </script>
-
-</body>
-</html>
