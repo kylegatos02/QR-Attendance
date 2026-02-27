@@ -107,12 +107,19 @@ function showResult(message, type) {
   const box = document.getElementById("resultBox");
   box.className = "";
   box.classList.add(type);
-  box.innerHTML = message;
+
+  const lines = message.split("\n");
+
+  box.innerHTML = `
+    <div style="font-size:36px;font-weight:bold;">${lines[0]}</div>
+    ${lines[1] ? `<div style="font-size:28px;margin-top:10px;">${lines[1]}</div>` : ""}
+  `;
+
   box.style.display = "block";
 
   setTimeout(() => {
     box.style.display = "none";
-  }, 2500);
+  }, 3000);
 }
 
 function onScanSuccess(decodedText) {
@@ -123,19 +130,23 @@ function onScanSuccess(decodedText) {
     .then(response => response.text())
     .then(result => {
 
-      if (result.includes("APPROVED")) {
-        showResult("✅ APPROVED", "approved");
+      const lines = result.split("\n");
+      const status = lines[0];
+      const fullName = lines[1] || "";
+    
+      if (status === "APPROVED") {
+        showResult("✅ APPROVED\n" + fullName, "approved");
       }
-      else if (result.includes("ALREADY_SCANNED")) {
-        showResult("⚠ ALREADY SCANNED", "error");
+      else if (status === "ALREADY_SCANNED") {
+        showResult("⚠ ALREADY SCANNED\n" + fullName, "error");
       }
-      else if (result.includes("NOT_FOUND")) {
-        showResult("❌ NOT FOUND", "error");
+      else if (status === "NOT_FOUND") {
+        showResult("❌ ID NOT FOUND", "error");
       }
       else {
         showResult("⚠ SYSTEM ERROR", "error");
       }
-
+    
       setTimeout(() => {
         isProcessing = false;
       }, 1500);
