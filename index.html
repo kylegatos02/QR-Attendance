@@ -8,32 +8,31 @@
       font-family: Arial, sans-serif;
       text-align: center;
       padding: 20px;
+      background: #f5f5f5;
     }
     h1 {
       margin-bottom: 20px;
     }
-    #nameInput {
-      padding: 10px;
-      width: 200px;
-      font-size: 16px;
-      margin-bottom: 20px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
+
     #reader {
-      width: 500px; /* bigger QR reader */
-      height: 500px;
+      width: 100%;
+      max-width: 400px;  /* max width for desktop */
       margin: 0 auto 20px auto;
     }
+
     #resultBox {
       display: none;
       text-align: center;
-      padding: 10px;
+      padding: 15px;
       font-weight: bold;
       border-radius: 5px;
-      width: 300px;
+      width: 90%;
+      max-width: 300px;
       margin: 0 auto;
+      white-space: pre-line; /* allows line breaks */
+      font-size: 18px;
     }
+
     .approved {
       background-color: #d4edda;
       color: #155724;
@@ -47,9 +46,6 @@
 <body>
 
   <h1>QR Code Scanner</h1>
-
-  <!-- Name input -->
-  <input type="text" id="nameInput" placeholder="Enter your name">
 
   <!-- QR Code Reader -->
   <div id="reader"></div>
@@ -73,36 +69,33 @@
 
       setTimeout(() => {
         box.style.display = "none";
-      }, 2000);
+      }, 2500);
     }
 
     function onScanSuccess(decodedText) {
       if (isProcessing) return;
       isProcessing = true;
 
-      const name = document.getElementById("nameInput").value || "Unknown";
-      showResult(`Checking for ${name}...`, "approved");
+      showResult("Checking...", "approved");
 
-      fetch(webAppUrl + "?id=" + decodedText + "&name=" + encodeURIComponent(name))
-        .then(response => response.text())
-        .then(result => {
-          console.log("Server Response:", result);
+      fetch(webAppUrl + "?id=" + encodeURIComponent(decodedText))
+        .then(response => response.json())
+        .then(data => {
+          console.log("Server Response:", data);
 
-          if (result.includes("APPROVED")) {
-            showResult(`✅ ${name} APPROVED`, "approved");
-          } else if (result.includes("ALREADY_SCANNED")) {
-            showResult(`⚠ ${name} ALREADY SCANNED`, "error");
-          } else if (result.includes("NOT_FOUND")) {
-            showResult(`❌ ${name} ID NOT FOUND`, "error");
-          } else if (result.includes("ERROR")) {
+          if (data.status === "APPROVED") {
+            showResult(`✅ APPROVED\n${data.name}`, "approved");
+          } else if (data.status === "ALREADY_SCANNED") {
+            showResult(`⚠ ALREADY SCANNED\n${data.name}`, "error");
+          } else if (data.status === "NOT_FOUND") {
+            showResult(`❌ ID NOT FOUND`, "error");
+          } else if (data.status === "ERROR") {
             showResult(`⚠ SYSTEM ERROR`, "error");
           } else {
             showResult(`⚠ UNKNOWN RESPONSE`, "error");
           }
 
-          setTimeout(() => {
-            isProcessing = false;
-          }, 1500);
+          setTimeout(() => { isProcessing = false; }, 1500);
         })
         .catch(error => {
           console.error("Fetch error:", error);
@@ -112,16 +105,18 @@
     }
 
     function onScanFailure(error) {
-      // ignore scan failures
+      // do nothing for failed scans
     }
 
     window.addEventListener('DOMContentLoaded', () => {
       const html5QrCode = new Html5Qrcode("reader");
+
       Html5Qrcode.getCameras().then(devices => {
         if (devices && devices.length) {
+          const width = Math.min(window.innerWidth * 0.9, 400);
           html5QrCode.start(
             { facingMode: "environment" },
-            { fps: 20, qrbox: 400 }, // QR box bigger
+            { fps: 20, qrbox: width }, // responsive QR box
             onScanSuccess,
             onScanFailure
           );
