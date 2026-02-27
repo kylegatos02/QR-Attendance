@@ -1,9 +1,67 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>TEST</title>
-</head>
-<body>
-  <h1>HELLO GITHUB</h1>
-</body>
-</html>
+<script>
+window.onload = function() {
+
+  const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec";
+  let isProcessing = false;
+
+  function showResult(message, type) {
+    const box = document.getElementById("resultBox");
+    box.className = "";
+    box.classList.add(type);
+    box.innerHTML = message;
+    box.style.display = "block";
+
+    setTimeout(() => {
+      box.style.display = "none";
+    }, 2000);
+  }
+
+  function onScanSuccess(decodedText) {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    if (!decodedText.includes("|")) {
+      showResult("⚠ INVALID QR FORMAT", "error");
+      isProcessing = false;
+      return;
+    }
+
+    let parts = decodedText.split("|");
+    let scannedId = parts[0];
+    let scannedName = parts[1] || "";
+
+    fetch(webAppUrl + "?id=" + encodeURIComponent(scannedId))
+      .then(response => response.text())
+      .then(result => {
+        result = result.trim();
+
+        if (result === "APPROVED") {
+          showResult("✅ APPROVED<br>" + scannedName, "approved");
+        } else {
+          showResult("❌ " + result, "error");
+        }
+
+        setTimeout(() => {
+          isProcessing = false;
+        }, 1500);
+      })
+      .catch(error => {
+        showResult("⚠ CONNECTION ERROR", "error");
+        isProcessing = false;
+      });
+  }
+
+  const html5QrCode = new Html5Qrcode("reader");
+
+  Html5Qrcode.getCameras().then(devices => {
+    if (devices.length) {
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 20, qrbox: 250 },
+        onScanSuccess
+      );
+    }
+  });
+
+};
+</script>
