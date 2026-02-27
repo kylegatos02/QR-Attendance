@@ -3,37 +3,88 @@
 <head>
   <meta charset="UTF-8">
   <title>QR Code Scanner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
     body {
+      margin: 0;
       font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      height: 100vh;
+      background-color: #f4f4f4;
       text-align: center;
-      padding: 20px;
     }
+
     h1 {
-      margin-bottom: 20px;
+      margin: 10px 0;
+      font-size: 24px;
+      color: #333;
     }
+
+    #scanner-container {
+      position: relative;
+      width: 90vw;
+      max-width: 500px;
+      aspect-ratio: 1 / 1; /* Square container */
+      margin: 10px auto;
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      background-color: #000;
+    }
+
     #reader {
-      width: 500px; /* bigger QR reader */
-      height: 500px;
-      margin: 0 auto 20px auto;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
+
+    /* Highlight scanning area in the middle */
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      box-sizing: border-box;
+      border: 3px dashed rgba(255, 255, 255, 0.7);
+      border-radius: 10px;
+      margin: auto;
+    }
+
     #resultBox {
       display: none;
       text-align: center;
       padding: 15px;
       font-weight: bold;
-      border-radius: 5px;
-      width: 400px;
-      margin: 0 auto;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      margin-top: 15px;
       font-size: 18px;
     }
+
     .approved {
       background-color: #d4edda;
       color: #155724;
     }
+
     .error {
       background-color: #f8d7da;
       color: #721c24;
+    }
+
+    @media (max-width: 400px) {
+      h1 {
+        font-size: 20px;
+      }
+      #resultBox {
+        font-size: 16px;
+      }
     }
   </style>
 </head>
@@ -41,13 +92,16 @@
 
   <h1>QR Code Scanner</h1>
 
-  <!-- QR Code Reader -->
-  <div id="reader"></div>
+  <!-- Scanner -->
+  <div id="scanner-container">
+    <div id="reader"></div>
+    <div id="overlay"></div>
+  </div>
 
   <!-- Result Box -->
   <div id="resultBox"></div>
 
-  <!-- Include QR Code library -->
+  <!-- QR Code library -->
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <script>
@@ -61,9 +115,7 @@
       box.innerHTML = message;
       box.style.display = "block";
 
-      setTimeout(() => {
-        box.style.display = "none";
-      }, 3000);
+      setTimeout(() => { box.style.display = "none"; }, 3000);
     }
 
     function onScanSuccess(decodedText) {
@@ -72,31 +124,18 @@
 
       showResult(`Checking student ID ${decodedText}...`, "approved");
 
-      // Fetch student info from Google Sheets
       fetch(webAppUrl + "?id=" + encodeURIComponent(decodedText))
         .then(response => response.json())
         .then(data => {
-          console.log("Server Response:", data);
-
-          // Assuming your Apps Script returns JSON like:
-          // { status: "APPROVED", name: "John Doe" }
           const studentName = data.name || "Unknown";
 
-          if (data.status === "APPROVED") {
-            showResult(`✅ ${studentName} APPROVED`, "approved");
-          } else if (data.status === "ALREADY_SCANNED") {
-            showResult(`⚠ ${studentName} ALREADY SCANNED`, "error");
-          } else if (data.status === "NOT_FOUND") {
-            showResult(`❌ ${studentName} ID NOT FOUND`, "error");
-          } else if (data.status === "ERROR") {
-            showResult(`⚠ SYSTEM ERROR`, "error");
-          } else {
-            showResult(`⚠ UNKNOWN RESPONSE`, "error");
-          }
+          if (data.status === "APPROVED") showResult(`✅ ${studentName} APPROVED`, "approved");
+          else if (data.status === "ALREADY_SCANNED") showResult(`⚠ ${studentName} ALREADY SCANNED`, "error");
+          else if (data.status === "NOT_FOUND") showResult(`❌ ${studentName} ID NOT FOUND`, "error");
+          else if (data.status === "ERROR") showResult(`⚠ SYSTEM ERROR`, "error");
+          else showResult(`⚠ UNKNOWN RESPONSE`, "error");
 
-          setTimeout(() => {
-            isProcessing = false;
-          }, 1500);
+          setTimeout(() => { isProcessing = false; }, 1500);
         })
         .catch(error => {
           console.error("Fetch error:", error);
@@ -106,7 +145,7 @@
     }
 
     function onScanFailure(error) {
-      // ignore scan failures
+      // ignore failures
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -115,13 +154,11 @@
         if (devices && devices.length) {
           html5QrCode.start(
             { facingMode: "environment" },
-            { fps: 20, qrbox: 400 },
+            { fps: 20, qrbox: { width: 250, height: 250 } }, // center QR box
             onScanSuccess,
             onScanFailure
           );
-        } else {
-          showResult("⚠ No camera found", "error");
-        }
+        } else showResult("⚠ No camera found", "error");
       }).catch(err => {
         console.error("Camera error:", err);
         showResult("⚠ Camera error", "error");
