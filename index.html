@@ -8,31 +8,25 @@
       font-family: Arial, sans-serif;
       text-align: center;
       padding: 20px;
-      background: #f5f5f5;
     }
     h1 {
       margin-bottom: 20px;
     }
-
     #reader {
-      width: 100%;
-      max-width: 400px;  /* max width for desktop */
+      width: 500px; /* bigger QR reader */
+      height: 500px;
       margin: 0 auto 20px auto;
     }
-
     #resultBox {
       display: none;
       text-align: center;
       padding: 15px;
       font-weight: bold;
       border-radius: 5px;
-      width: 90%;
-      max-width: 300px;
+      width: 400px;
       margin: 0 auto;
-      white-space: pre-line; /* allows line breaks */
       font-size: 18px;
     }
-
     .approved {
       background-color: #d4edda;
       color: #155724;
@@ -69,33 +63,40 @@
 
       setTimeout(() => {
         box.style.display = "none";
-      }, 2500);
+      }, 3000);
     }
 
     function onScanSuccess(decodedText) {
       if (isProcessing) return;
       isProcessing = true;
 
-      showResult("Checking...", "approved");
+      showResult(`Checking student ID ${decodedText}...`, "approved");
 
+      // Fetch student info from Google Sheets
       fetch(webAppUrl + "?id=" + encodeURIComponent(decodedText))
         .then(response => response.json())
         .then(data => {
           console.log("Server Response:", data);
 
+          // Assuming your Apps Script returns JSON like:
+          // { status: "APPROVED", name: "John Doe" }
+          const studentName = data.name || "Unknown";
+
           if (data.status === "APPROVED") {
-            showResult(`✅ APPROVED\n${data.name}`, "approved");
+            showResult(`✅ ${studentName} APPROVED`, "approved");
           } else if (data.status === "ALREADY_SCANNED") {
-            showResult(`⚠ ALREADY SCANNED\n${data.name}`, "error");
+            showResult(`⚠ ${studentName} ALREADY SCANNED`, "error");
           } else if (data.status === "NOT_FOUND") {
-            showResult(`❌ ID NOT FOUND`, "error");
+            showResult(`❌ ${studentName} ID NOT FOUND`, "error");
           } else if (data.status === "ERROR") {
             showResult(`⚠ SYSTEM ERROR`, "error");
           } else {
             showResult(`⚠ UNKNOWN RESPONSE`, "error");
           }
 
-          setTimeout(() => { isProcessing = false; }, 1500);
+          setTimeout(() => {
+            isProcessing = false;
+          }, 1500);
         })
         .catch(error => {
           console.error("Fetch error:", error);
@@ -105,18 +106,16 @@
     }
 
     function onScanFailure(error) {
-      // do nothing for failed scans
+      // ignore scan failures
     }
 
     window.addEventListener('DOMContentLoaded', () => {
       const html5QrCode = new Html5Qrcode("reader");
-
       Html5Qrcode.getCameras().then(devices => {
         if (devices && devices.length) {
-          const width = Math.min(window.innerWidth * 0.9, 400);
           html5QrCode.start(
             { facingMode: "environment" },
-            { fps: 20, qrbox: width }, // responsive QR box
+            { fps: 20, qrbox: 400 },
             onScanSuccess,
             onScanFailure
           );
