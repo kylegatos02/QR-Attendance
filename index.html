@@ -28,7 +28,7 @@
       position: relative;
       width: 90vw;
       max-width: 500px;
-      aspect-ratio: 1 / 1; /* square camera area */
+      height: 300px; /* Rectangle height */
       margin: 10px auto;
       border-radius: 15px;
       overflow: hidden;
@@ -79,7 +79,6 @@
       color: #721c24;
     }
 
-    /* Optional: add status and name lines */
     .status {
       font-size: 28px;
       font-weight: bold;
@@ -92,19 +91,10 @@
     }
 
     @media (max-width: 400px) {
-      h1 {
-        font-size: 20px;
-      }
-      #resultBox {
-        font-size: 20px;
-        padding: 15px;
-      }
-      .status {
-        font-size: 24px;
-      }
-      .student-name {
-        font-size: 26px;
-      }
+      h1 { font-size: 20px; }
+      #resultBox { font-size: 20px; padding: 15px; }
+      .status { font-size: 24px; }
+      .student-name { font-size: 26px; }
     }
   </style>
 </head>
@@ -120,7 +110,6 @@
 <div id="resultBox"></div>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
-
 <script>
 const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec";
 let isProcessing = false;
@@ -129,14 +118,16 @@ function showResult(message, type) {
   const box = document.getElementById("resultBox");
   box.className = "";
   box.classList.add(type);
-  // Split message into lines for status and name
-  const lines = message.split("\n");
-  box.innerHTML = `<div class="status">${lines[0]}</div>` + (lines[1] ? `<div class="student-name">${lines[1]}</div>` : "");
+
+  // Split by "|" if present
+  const parts = message.split("|");
+  const status = parts[0];
+  const name = parts[1] || "";
+
+  box.innerHTML = `<div class="status">${status}</div>` + (name ? `<div class="student-name">${name}</div>` : "");
   box.style.display = "block";
 
-  setTimeout(() => {
-    box.style.display = "none";
-  }, 3000);
+  setTimeout(() => { box.style.display = "none"; }, 3000);
 }
 
 function onScanSuccess(decodedText) {
@@ -150,30 +141,17 @@ function onScanSuccess(decodedText) {
     .then(result => {
       console.log("Server Response:", result);
 
-      if (result.includes("APPROVED")) {
-        showResult("✅ APPROVED!", "approved");
-      }
-      else if (result.includes("ALREADY_SCANNED")) {
-        showResult("⚠ ALREADY SCANNED", "error");
-      }
-      else if (result.includes("NOT_FOUND")) {
-        showResult("❌ ID NOT FOUND", "error");
-      }
-      else if (result.includes("ERROR")) {
-        showResult("⚠ SYSTEM ERROR", "error");
-      }
-      else {
-        showResult("⚠ UNKNOWN RESPONSE", "error");
-      }
+      if (result.includes("APPROVED")) showResult(result, "approved");
+      else if (result.includes("ALREADY_SCANNED")) showResult(result, "error");
+      else if (result.includes("NOT_FOUND")) showResult(result, "error");
+      else if (result.includes("ERROR")) showResult(result, "error");
+      else showResult("UNKNOWN RESPONSE", "error");
 
-      setTimeout(() => {
-        isProcessing = false;
-      }, 1500);
-
+      setTimeout(() => { isProcessing = false; }, 1500);
     })
     .catch(error => {
       console.error("Fetch error:", error);
-      showResult("⚠ CONNECTION ERROR", "error");
+      showResult("CONNECTION ERROR", "error");
       isProcessing = false;
     });
 }
@@ -181,12 +159,11 @@ function onScanSuccess(decodedText) {
 function onScanFailure(error) {}
 
 const html5QrCode = new Html5Qrcode("reader");
-
 Html5Qrcode.getCameras().then(devices => {
   if (devices && devices.length) {
     html5QrCode.start(
       { facingMode: "environment" },
-      { fps: 60, qrbox: 350 },
+      { fps: 20, qrbox: { width: 400, height: 200 } }, 
       onScanSuccess,
       onScanFailure
     );
