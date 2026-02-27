@@ -1,74 +1,114 @@
-<script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>QR Code Scanner</title>
+  <style>
+    #reader {
+      width: 300px;
+      margin: 20px auto;
+    }
+    #resultBox {
+      display: none;
+      text-align: center;
+      padding: 10px;
+      margin-top: 10px;
+      font-weight: bold;
+      border-radius: 5px;
+    }
+    .approved {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</head>
+<body>
+  <!-- QR Code Reader -->
+  <div id="reader"></div>
 
-const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec"; 
-let isProcessing = false;
+  <!-- Result Box -->
+  <div id="resultBox"></div>
 
-function showResult(message, type) {
-  const box = document.getElementById("resultBox");
-  box.className = "";
-  box.classList.add(type);
-  box.innerHTML = message;
-  box.style.display = "block";
+  <!-- Include QR Code library -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
-  setTimeout(() => {
-    box.style.display = "none";
-  }, 2000);
-}
+  <script>
+    // Replace this with your Google Apps Script Web App URL
+    const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec"; 
+    let isProcessing = false;
 
-function onScanSuccess(decodedText) {
-
-  if (isProcessing) return;
-  isProcessing = true;
-
-  showResult("Checking...", "approved");
-
-  fetch(webAppUrl + "?id=" + decodedText)
-    .then(response => response.text())
-    .then(result => {
-
-      console.log("Server Response:", result);
-
-      if (result.includes("APPROVED")) {
-        showResult("✅ APPROVED", "approved");
-      }
-      else if (result.includes("ALREADY_SCANNED")) {
-        showResult("⚠ ALREADY SCANNED", "error");
-      }
-      else if (result.includes("NOT_FOUND")) {
-        showResult("❌ ID NOT FOUND", "error");
-      }
-      else if (result.includes("ERROR")) {
-        showResult("⚠ SYSTEM ERROR", "error");
-      }
-      else {
-        showResult("⚠ UNKNOWN RESPONSE", "error");
-      }
+    function showResult(message, type) {
+      const box = document.getElementById("resultBox");
+      box.className = "";
+      box.classList.add(type);
+      box.innerHTML = message;
+      box.style.display = "block";
 
       setTimeout(() => {
-        isProcessing = false;
-      }, 1500);
+        box.style.display = "none";
+      }, 2000);
+    }
 
-    })
-    .catch(error => {
-      console.error("Fetch error:", error);
-      showResult("⚠ CONNECTION ERROR", "error");
-      isProcessing = false;
+    function onScanSuccess(decodedText) {
+      if (isProcessing) return;
+      isProcessing = true;
+
+      showResult("Checking...", "approved");
+
+      fetch(webAppUrl + "?id=" + decodedText)
+        .then(response => response.text())
+        .then(result => {
+          console.log("Server Response:", result);
+
+          if (result.includes("APPROVED")) {
+            showResult("✅ APPROVED", "approved");
+          } else if (result.includes("ALREADY_SCANNED")) {
+            showResult("⚠ ALREADY SCANNED", "error");
+          } else if (result.includes("NOT_FOUND")) {
+            showResult("❌ ID NOT FOUND", "error");
+          } else if (result.includes("ERROR")) {
+            showResult("⚠ SYSTEM ERROR", "error");
+          } else {
+            showResult("⚠ UNKNOWN RESPONSE", "error");
+          }
+
+          setTimeout(() => {
+            isProcessing = false;
+          }, 1500);
+        })
+        .catch(error => {
+          console.error("Fetch error:", error);
+          showResult("⚠ CONNECTION ERROR", "error");
+          isProcessing = false;
+        });
+    }
+
+    function onScanFailure(error) {
+      // ignore scan failures
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const html5QrCode = new Html5Qrcode("reader");
+      Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+          html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 20, qrbox: 250 },
+            onScanSuccess,
+            onScanFailure
+          );
+        } else {
+          showResult("⚠ No camera found", "error");
+        }
+      }).catch(err => {
+        console.error("Camera error:", err);
+        showResult("⚠ Camera error", "error");
+      });
     });
-}
-
-function onScanFailure(error) {}
-
-const html5QrCode = new Html5Qrcode("reader");
-
-Html5Qrcode.getCameras().then(devices => {
-  if (devices && devices.length) {
-    html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 20, qrbox: 250 },
-      onScanSuccess,
-      onScanFailure
-    );
-  }
-});
-
-</script>
+  </script>
+</body>
+</html>
