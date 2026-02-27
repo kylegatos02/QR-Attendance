@@ -1,67 +1,74 @@
 <script>
-window.onload = function() {
 
-  const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec";
-  let isProcessing = false;
+const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec"; 
+let isProcessing = false;
 
-  function showResult(message, type) {
-    const box = document.getElementById("resultBox");
-    box.className = "";
-    box.classList.add(type);
-    box.innerHTML = message;
-    box.style.display = "block";
+function showResult(message, type) {
+  const box = document.getElementById("resultBox");
+  box.className = "";
+  box.classList.add(type);
+  box.innerHTML = message;
+  box.style.display = "block";
 
-    setTimeout(() => {
-      box.style.display = "none";
-    }, 2000);
-  }
+  setTimeout(() => {
+    box.style.display = "none";
+  }, 2000);
+}
 
-  function onScanSuccess(decodedText) {
-    if (isProcessing) return;
-    isProcessing = true;
+function onScanSuccess(decodedText) {
 
-    if (!decodedText.includes("|")) {
-      showResult("⚠ INVALID QR FORMAT", "error");
-      isProcessing = false;
-      return;
-    }
+  if (isProcessing) return;
+  isProcessing = true;
 
-    let parts = decodedText.split("|");
-    let scannedId = parts[0];
-    let scannedName = parts[1] || "";
+  showResult("Checking...", "approved");
 
-    fetch(webAppUrl + "?id=" + encodeURIComponent(scannedId))
-      .then(response => response.text())
-      .then(result => {
-        result = result.trim();
+  fetch(webAppUrl + "?id=" + decodedText)
+    .then(response => response.text())
+    .then(result => {
 
-        if (result === "APPROVED") {
-          showResult("✅ APPROVED<br>" + scannedName, "approved");
-        } else {
-          showResult("❌ " + result, "error");
-        }
+      console.log("Server Response:", result);
 
-        setTimeout(() => {
-          isProcessing = false;
-        }, 1500);
-      })
-      .catch(error => {
-        showResult("⚠ CONNECTION ERROR", "error");
+      if (result.includes("APPROVED")) {
+        showResult("✅ APPROVED", "approved");
+      }
+      else if (result.includes("ALREADY_SCANNED")) {
+        showResult("⚠ ALREADY SCANNED", "error");
+      }
+      else if (result.includes("NOT_FOUND")) {
+        showResult("❌ ID NOT FOUND", "error");
+      }
+      else if (result.includes("ERROR")) {
+        showResult("⚠ SYSTEM ERROR", "error");
+      }
+      else {
+        showResult("⚠ UNKNOWN RESPONSE", "error");
+      }
+
+      setTimeout(() => {
         isProcessing = false;
-      });
+      }, 1500);
+
+    })
+    .catch(error => {
+      console.error("Fetch error:", error);
+      showResult("⚠ CONNECTION ERROR", "error");
+      isProcessing = false;
+    });
+}
+
+function onScanFailure(error) {}
+
+const html5QrCode = new Html5Qrcode("reader");
+
+Html5Qrcode.getCameras().then(devices => {
+  if (devices && devices.length) {
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 20, qrbox: 250 },
+      onScanSuccess,
+      onScanFailure
+    );
   }
+});
 
-  const html5QrCode = new Html5Qrcode("reader");
-
-  Html5Qrcode.getCameras().then(devices => {
-    if (devices.length) {
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 20, qrbox: 250 },
-        onScanSuccess
-      );
-    }
-  });
-
-};
 </script>
