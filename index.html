@@ -1,133 +1,166 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>QR Code Scanner</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 20px;
-    }
-    h1 {
-      margin-bottom: 20px;
-    }
-    #reader {
-      width: 500px; /* bigger QR reader */
-      height: 500px;
-      margin: 0 auto 20px auto;
-    }
-    #resultBox {
-      display: none;
-      text-align: center;
-      padding: 15px;
-      font-weight: bold;
-      border-radius: 5px;
-      width: 400px;
-      margin: 0 auto;
-      font-size: 18px;
-    }
-    .approved {
-      background-color: #d4edda;
-      color: #155724;
-    }
-    .error {
-      background-color: #f8d7da;
-      color: #721c24;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Event QR Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: white;
+}
+
+h1 {
+  margin-bottom: 15px;
+  font-size: 28px;
+  letter-spacing: 1px;
+}
+
+#scanner-container {
+  position: relative;
+  width: 95vw;
+  max-width: 500px;
+  aspect-ratio: 1 / 1;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+
+#reader {
+  width: 100%;
+  height: 100%;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  border: 4px solid rgba(255,255,255,0.6);
+  border-radius: 20px;
+  pointer-events: none;
+}
+
+#resultBox {
+  position: fixed;
+  bottom: 40px;
+  width: 90%;
+  max-width: 500px;
+  text-align: center;
+  padding: 25px;
+  border-radius: 20px;
+  font-size: 36px;
+  font-weight: bold;
+  display: none;
+  animation: pop 0.3s ease;
+}
+
+.approved {
+  background: #00c853;
+  color: white;
+  box-shadow: 0 0 25px rgba(0, 255, 100, 0.8);
+}
+
+.error {
+  background: #d50000;
+  color: white;
+  box-shadow: 0 0 25px rgba(255, 0, 0, 0.8);
+}
+
+@keyframes pop {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@media(max-width: 500px){
+  #resultBox {
+    font-size: 26px;
+  }
+}
+</style>
 </head>
+
 <body>
 
-  <h1>QR Code Scanner</h1>
+<h1>EVENT QR ATTENDANCE</h1>
 
-  <!-- QR Code Reader -->
+<div id="scanner-container">
   <div id="reader"></div>
+  <div id="overlay"></div>
+</div>
 
-  <!-- Result Box -->
-  <div id="resultBox"></div>
+<div id="resultBox"></div>
 
-  <!-- Include QR Code library -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
 
-  <script>
-    const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec"; 
-    let isProcessing = false;
+<script>
+const webAppUrl = "https://script.google.com/macros/s/AKfycbyUgrL7pidfDBtHlagXU9k7Bhm1uTINKFG6U643H0ZmLJ0H_GPZdpd1E6F1A7o0RSGm7g/exec";
+let isProcessing = false;
 
-    function showResult(message, type) {
-      const box = document.getElementById("resultBox");
-      box.className = "";
-      box.classList.add(type);
-      box.innerHTML = message;
-      box.style.display = "block";
+function showResult(message, type) {
+  const box = document.getElementById("resultBox");
+  box.className = "";
+  box.classList.add(type);
+  box.innerHTML = message;
+  box.style.display = "block";
+
+  setTimeout(() => {
+    box.style.display = "none";
+  }, 2500);
+}
+
+function onScanSuccess(decodedText) {
+  if (isProcessing) return;
+  isProcessing = true;
+
+  fetch(webAppUrl + "?id=" + decodedText)
+    .then(response => response.text())
+    .then(result => {
+
+      if (result.includes("APPROVED")) {
+        showResult("✅ APPROVED", "approved");
+      }
+      else if (result.includes("ALREADY_SCANNED")) {
+        showResult("⚠ ALREADY SCANNED", "error");
+      }
+      else if (result.includes("NOT_FOUND")) {
+        showResult("❌ NOT FOUND", "error");
+      }
+      else {
+        showResult("⚠ SYSTEM ERROR", "error");
+      }
 
       setTimeout(() => {
-        box.style.display = "none";
-      }, 3000);
-    }
-
-    function onScanSuccess(decodedText) {
-      if (isProcessing) return;
-      isProcessing = true;
-
-      showResult(`Checking student ID ${decodedText}...`, "approved");
-
-      // Fetch student info from Google Sheets
-      fetch(webAppUrl + "?id=" + encodeURIComponent(decodedText))
-        .then(response => response.json())
-        .then(data => {
-          console.log("Server Response:", data);
-
-          // Assuming your Apps Script returns JSON like:
-          // { status: "APPROVED", name: "John Doe" }
-          const studentName = data.name || "Unknown";
-
-          if (data.status === "APPROVED") {
-            showResult(`✅ ${studentName} APPROVED`, "approved");
-          } else if (data.status === "ALREADY_SCANNED") {
-            showResult(`⚠ ${studentName} ALREADY SCANNED`, "error");
-          } else if (data.status === "NOT_FOUND") {
-            showResult(`❌ ${studentName} ID NOT FOUND`, "error");
-          } else if (data.status === "ERROR") {
-            showResult(`⚠ SYSTEM ERROR`, "error");
-          } else {
-            showResult(`⚠ UNKNOWN RESPONSE`, "error");
-          }
-
-          setTimeout(() => {
-            isProcessing = false;
-          }, 1500);
-        })
-        .catch(error => {
-          console.error("Fetch error:", error);
-          showResult("⚠ CONNECTION ERROR", "error");
-          isProcessing = false;
-        });
-    }
-
-    function onScanFailure(error) {
-      // ignore scan failures
-    }
-
-    window.addEventListener('DOMContentLoaded', () => {
-      const html5QrCode = new Html5Qrcode("reader");
-      Html5Qrcode.getCameras().then(devices => {
-        if (devices && devices.length) {
-          html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 20, qrbox: 400 },
-            onScanSuccess,
-            onScanFailure
-          );
-        } else {
-          showResult("⚠ No camera found", "error");
-        }
-      }).catch(err => {
-        console.error("Camera error:", err);
-        showResult("⚠ Camera error", "error");
-      });
+        isProcessing = false;
+      }, 1500);
+    })
+    .catch(error => {
+      showResult("⚠ CONNECTION ERROR", "error");
+      isProcessing = false;
     });
-  </script>
+}
+
+function onScanFailure(error) {}
+
+const html5QrCode = new Html5Qrcode("reader");
+
+Html5Qrcode.getCameras().then(devices => {
+  if (devices && devices.length) {
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 20, qrbox: 280 },
+      onScanSuccess,
+      onScanFailure
+    );
+  }
+});
+</script>
 
 </body>
 </html>
