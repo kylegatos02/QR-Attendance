@@ -1,51 +1,102 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>QR Attendance Scanner</title>
+  <title>Event QR Scanner</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
   <style>
     body {
       text-align: center;
       font-family: Arial, sans-serif;
-      background: #f4f4f4;
+      background: #f2f2f2;
     }
+
     h2 {
-      margin-top: 20px;
+      margin-top: 15px;
     }
+
     #reader {
       width: 300px;
       margin: 20px auto;
     }
-    #status {
+
+    #resultBox {
       margin-top: 15px;
-      font-weight: bold;
+      padding: 15px;
       font-size: 18px;
+      font-weight: bold;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .approved {
+      background: #28a745;
+      color: white;
+    }
+
+    .error {
+      background: #dc3545;
+      color: white;
     }
   </style>
 </head>
 <body>
 
 <h2>Scan QR Code</h2>
+
 <div id="reader"></div>
-<div id="status">Camera starting...</div>
+<div id="resultBox"></div>
 
 <script>
-const webAppUrl = "https://script.google.com/macros/s/AKfycbxq2RP9XJ6FEde3M4vUUVtmxJvsrgJcCDUOalCcwqAMviFdQe_W2GosCqYN6RMifQ2dow/exec";
+
+const webAppUrl = "https://script.google.com/macros/s/AKfycbwPT5gENb9PU23PBw7oFTR0mJ1wshxSJjtbW8hmnZ0HaQb2T7OrAllbefdNDUf_9HqRDQ/exec"; 
+
+let isProcessing = false;
+
+function showResult(message, type) {
+  const box = document.getElementById("resultBox");
+  box.className = "";
+  box.classList.add(type);
+  box.innerHTML = message;
+  box.style.display = "block";
+
+  setTimeout(() => {
+    box.style.display = "none";
+  }, 2000);
+}
 
 function onScanSuccess(decodedText) {
-  document.getElementById("status").innerHTML = "Processing...";
 
-  // Stop camera after scan
-  html5QrCode.stop().then(() => {
-      // Redirect to Apps Script with scanned ID
-      window.location.href = webAppUrl + "?id=" + decodedText;
-  });
+  if (isProcessing) return;
+  isProcessing = true;
+
+  fetch(webAppUrl + "?id=" + decodedText)
+    .then(response => response.text())
+    .then(result => {
+
+      if (result.includes("APPROVED")) {
+        showResult("✅ APPROVED", "approved");
+      } 
+      else if (result.includes("ALREADY_SCANNED")) {
+        showResult("⚠ Already Scanned", "error");
+      } 
+      else {
+        showResult("❌ ID NOT FOUND", "error");
+      }
+
+      setTimeout(() => {
+        isProcessing = false;
+      }, 1500);
+
+    })
+    .catch(error => {
+      showResult("Server Error", "error");
+      isProcessing = false;
+    });
 }
 
-function onScanFailure(error) {
-  // Ignore scan errors
-}
+function onScanFailure(error) {}
 
 const html5QrCode = new Html5Qrcode("reader");
 
@@ -53,16 +104,13 @@ Html5Qrcode.getCameras().then(devices => {
   if (devices && devices.length) {
     html5QrCode.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
+      { fps: 20, qrbox: 250 },
       onScanSuccess,
       onScanFailure
     );
-  } else {
-    document.getElementById("status").innerHTML = "No camera found.";
   }
-}).catch(err => {
-  document.getElementById("status").innerHTML = "Camera error: " + err;
 });
+
 </script>
 
 </body>
