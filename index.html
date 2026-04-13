@@ -32,6 +32,7 @@ h2 {
   margin-top: 20px;
   font-size: 18px;
   padding: 10px;
+  word-break: break-word;
 }
 </style>
 </head>
@@ -41,7 +42,7 @@ h2 {
 <h2>OFFLINE QR ATTENDANCE</h2>
 
 <div id="reader"></div>
-<div id="result">Initializing...</div>
+<div id="result">Loading camera...</div>
 
 <script>
 const SYNC_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
@@ -55,7 +56,7 @@ const deviceId = localStorage.getItem("deviceId") ||
 localStorage.setItem("deviceId", deviceId);
 
 // -------------------------
-// INDEXEDDB SETUP
+// INDEXEDDB
 // -------------------------
 let db;
 
@@ -64,7 +65,7 @@ const request = indexedDB.open("AttendanceDB", 1);
 request.onupgradeneeded = function(e) {
   db = e.target.result;
 
-  const store = db.createObjectStore("attendance", {
+  db.createObjectStore("attendance", {
     keyPath: "key",
     autoIncrement: true
   });
@@ -85,7 +86,7 @@ function saveOffline(record) {
 }
 
 // -------------------------
-// SCAN LOGIC
+// SCAN CONTROL
 // -------------------------
 let lastScan = "";
 
@@ -106,12 +107,11 @@ function onScanSuccess(decodedText) {
   document.getElementById("result").innerText =
     "Saved Offline: " + decodedText;
 
-  // reset scan lock
   setTimeout(() => lastScan = "", 1500);
 }
 
 // -------------------------
-// SYNC FUNCTION
+// SYNC TO GOOGLE SHEETS
 // -------------------------
 function syncData() {
 
@@ -120,11 +120,11 @@ function syncData() {
   const tx = db.transaction(["attendance"], "readonly");
   const store = tx.objectStore("attendance");
 
-  const request = store.getAll();
+  const req = store.getAll();
 
-  request.onsuccess = function() {
+  req.onsuccess = function() {
 
-    const data = request.result;
+    const data = req.result;
 
     if (!data.length) return;
 
@@ -144,43 +144,56 @@ function syncData() {
         const store2 = tx2.objectStore("attendance");
         store2.clear();
 
-        console.log("SYNCED SUCCESS");
+        console.log("SYNC DONE");
       }
     });
   };
 }
 
-// auto sync every 10 sec
 setInterval(syncData, 10000);
 
 // -------------------------
-// CAMERA START (FIXED)
+// CAMERA START (FORCE BACK CAMERA)
 // -------------------------
 Html5Qrcode.getCameras().then(devices => {
 
-  if (devices && devices.length) {
-
-    const cameraId = devices[0].id;
-
-    const html5QrCode = new Html5Qrcode("reader");
-
-    html5QrCode.start(
-      cameraId,
-      {
-        fps: 8,
-        qrbox: 220,
-        disableFlip: true
-      },
-      onScanSuccess
-    );
-
-  } else {
+  if (!devices || devices.length === 0) {
     document.getElementById("result").innerText = "No camera found";
+    return;
   }
+
+  console.log("Cameras:", devices);
+
+  // Try to find back camera
+  let backCamera = devices.find(device =>
+    device.label.toLowerCase().includes("back") ||
+    device.label.toLowerCase().includes("rear")
+  );
+
+  const cameraId = backCamera ? backCamera.id : devices[0].id;
+
+  const html5QrCode = new Html5Qrcode("reader");
+
+  html5QrCode.start(
+    cameraId,
+    {
+      fps: 8,
+      qrbox: 220,
+      disableFlip: true
+    },
+    onScanSuccess
+  )
+  .then(() => {
+    document.getElementById("result").innerText = "Camera Started";
+  })
+  .catch(err => {
+    console.error(err);
+    document.getElementById("result").innerText = "Camera Error";
+  });
 
 }).catch(err => {
   console.error(err);
-  document.getElementById("result").innerText = "Camera error";
+  document.getElementById("result").innerText = "Camera Access Denied";
 });
 </script>
 
