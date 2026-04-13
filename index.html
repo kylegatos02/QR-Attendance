@@ -114,7 +114,7 @@ function onScanSuccess(decodedText) {
   lastScan = decodedText;
 
   const record = {
-    id: decodedText,
+    name: decodedText,
     status: "Present",
     date: new Date().toISOString(),
     device: deviceId
