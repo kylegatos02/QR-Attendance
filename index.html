@@ -29,10 +29,16 @@ h2 {
 }
 
 #result {
-  margin-top: 20px;
+  margin-top: 15px;
   font-size: 18px;
-  padding: 10px;
-  word-break: break-word;
+}
+
+#syncStatus {
+  margin-top: 10px;
+  font-size: 16px;
+  padding: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
 }
 </style>
 </head>
@@ -42,10 +48,12 @@ h2 {
 <h2>OFFLINE QR ATTENDANCE</h2>
 
 <div id="reader"></div>
-<div id="result">Loading camera...</div>
+
+<div id="result">Loading...</div>
+<div id="syncStatus">SYNC: UNKNOWN</div>
 
 <script>
-const SYNC_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+const SYNC_URL = "https://script.google.com/macros/s/AKfycbz7eKqZ7z-tQQF7dKsFUX-VO684GcHlkPotTB1a7IUWmguSREcXB28h-cpq7oaDS2h_gg/exec";
 
 // -------------------------
 // DEVICE ID
@@ -56,10 +64,15 @@ const deviceId = localStorage.getItem("deviceId") ||
 localStorage.setItem("deviceId", deviceId);
 
 // -------------------------
-// INDEXEDDB
+// GLOBAL VARIABLES
 // -------------------------
 let db;
+let pendingSync = 0;
+let lastSyncTime = null;
 
+// -------------------------
+// INDEXEDDB INIT
+// -------------------------
 const request = indexedDB.open("AttendanceDB", 1);
 
 request.onupgradeneeded = function(e) {
@@ -73,16 +86,21 @@ request.onupgradeneeded = function(e) {
 
 request.onsuccess = function(e) {
   db = e.target.result;
-  document.getElementById("result").innerText = "Scanner Ready";
+  updateStatus("READY");
 };
 
 // -------------------------
 // SAVE OFFLINE
 // -------------------------
 function saveOffline(record) {
+
   const tx = db.transaction(["attendance"], "readwrite");
   const store = tx.objectStore("attendance");
+
   store.add(record);
+
+  pendingSync++;
+  updateStatus("PENDING");
 }
 
 // -------------------------
@@ -111,11 +129,14 @@ function onScanSuccess(decodedText) {
 }
 
 // -------------------------
-// SYNC TO GOOGLE SHEETS
+// SYNC DATA
 // -------------------------
 function syncData() {
 
-  if (!navigator.onLine || !db) return;
+  if (!navigator.onLine || !db || pendingSync === 0) {
+    updateStatus("OFFLINE");
+    return;
+  }
 
   const tx = db.transaction(["attendance"], "readonly");
   const store = tx.objectStore("attendance");
@@ -144,16 +165,51 @@ function syncData() {
         const store2 = tx2.objectStore("attendance");
         store2.clear();
 
-        console.log("SYNC DONE");
+        pendingSync = 0;
+        lastSyncTime = new Date();
+
+        updateStatus("SYNCED");
       }
+    })
+    .catch(() => {
+      updateStatus("SYNC_FAILED");
     });
   };
 }
 
+// auto sync every 10 sec
 setInterval(syncData, 10000);
 
 // -------------------------
-// CAMERA START (FORCE BACK CAMERA)
+// STATUS SYSTEM
+// -------------------------
+function updateStatus(type) {
+
+  const el = document.getElementById("syncStatus");
+
+  if (type === "SYNCED") {
+    el.innerHTML = "🟢 SYNCED<br>Last: " + lastSyncTime.toLocaleTimeString();
+  }
+
+  else if (type === "PENDING") {
+    el.innerHTML = "🟠 PENDING SYNC (" + pendingSync + ")";
+  }
+
+  else if (type === "OFFLINE") {
+    el.innerHTML = "🔴 OFFLINE - Waiting for internet";
+  }
+
+  else if (type === "SYNC_FAILED") {
+    el.innerHTML = "⚠ SYNC FAILED - retrying...";
+  }
+
+  else {
+    el.innerHTML = "SYNC: READY";
+  }
+}
+
+// -------------------------
+// CAMERA (BACK CAMERA PRIORITY)
 // -------------------------
 Html5Qrcode.getCameras().then(devices => {
 
@@ -162,9 +218,6 @@ Html5Qrcode.getCameras().then(devices => {
     return;
   }
 
-  console.log("Cameras:", devices);
-
-  // Try to find back camera
   let backCamera = devices.find(device =>
     device.label.toLowerCase().includes("back") ||
     device.label.toLowerCase().includes("rear")
@@ -184,16 +237,13 @@ Html5Qrcode.getCameras().then(devices => {
     onScanSuccess
   )
   .then(() => {
-    document.getElementById("result").innerText = "Camera Started";
+    document.getElementById("result").innerText = "Camera Ready";
   })
   .catch(err => {
     console.error(err);
     document.getElementById("result").innerText = "Camera Error";
   });
 
-}).catch(err => {
-  console.error(err);
-  document.getElementById("result").innerText = "Camera Access Denied";
 });
 </script>
 
