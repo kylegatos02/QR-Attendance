@@ -48,20 +48,7 @@ h1 {
   pointer-events: none;
 }
 
-/* Scan animation */
-#overlay::after {
-  content: "";
-  position: absolute;
-  width: 100%;
-  height: 3px;
-  background: rgba(0,255,0,0.8);
-  animation: scan 2s linear infinite;
-}
 
-@keyframes scan {
-  0% { top: 0; }
-  100% { top: 100%; }
-}
 
 #resultBox {
   position: fixed;
