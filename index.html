@@ -48,8 +48,7 @@ h1 {
   pointer-events: none;
 }
 
-
-
+/* RESULT BOX */
 #resultBox {
   position: fixed;
   bottom: 40px;
@@ -102,7 +101,7 @@ const webAppUrl = "https://script.google.com/macros/s/AKfycbz7eKqZ7z-tQQF7dKsFUX
 let isProcessing = false;
 let lastScanned = "";
 
-// SOUND FEEDBACK (optional but fast UX)
+// beep sound
 const beep = new Audio("https://www.soundjay.com/buttons/sounds/beep-01a.mp3");
 
 function showResult(message, type) {
@@ -131,7 +130,7 @@ function onScanSuccess(decodedText) {
   isProcessing = true;
   lastScanned = decodedText;
 
-  beep.play(); // instant feedback
+  beep.play();
 
   fetch(webAppUrl + "?id=" + decodedText, { cache: "no-store" })
     .then(response => response.text())
@@ -169,7 +168,6 @@ function onScanSuccess(decodedText) {
 
 function onScanFailure(error) {}
 
-// START CAMERA DIRECTLY (FASTER)
 const html5QrCode = new Html5Qrcode("reader");
 
 html5QrCode.start(
