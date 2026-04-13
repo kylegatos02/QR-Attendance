@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Offline QR Attendance</title>
+<title>QR Attendance System</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://unpkg.com/html5-qrcode"></script>
@@ -28,94 +28,66 @@ h2 {
   overflow: hidden;
 }
 
-#result {
-  margin-top: 15px;
-  font-size: 18px;
-}
-
-#syncStatus {
+#result, #status {
   margin-top: 10px;
   font-size: 16px;
-  padding: 8px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 8px;
 }
 </style>
 </head>
 
 <body>
 
-<h2>OFFLINE QR ATTENDANCE</h2>
+<h2>QR ATTENDANCE SYSTEM</h2>
 
 <div id="reader"></div>
 
 <div id="result">Loading...</div>
-<div id="syncStatus">SYNC: UNKNOWN</div>
+<div id="status">SYNC: READY</div>
 
 <script>
 const SYNC_URL = "https://script.google.com/macros/s/AKfycbye_LqtGkk5tMJViI2vveWk0JzVnE2jmVxSpw_qxsAmVwFFioM1bnNZf3-bhl4AFC384Q/exec";
 
-// -------------------------
-// DEVICE ID
-// -------------------------
+// -------------------- DEVICE ID
 const deviceId = localStorage.getItem("deviceId") ||
-  (crypto.randomUUID ? crypto.randomUUID() : "device-" + Math.random().toString(36).substr(2, 9));
+  (crypto.randomUUID ? crypto.randomUUID() : "dev-" + Math.random().toString(36).substr(2, 9));
 
 localStorage.setItem("deviceId", deviceId);
 
-// -------------------------
-// GLOBAL VARIABLES
-// -------------------------
+// -------------------- INDEXEDDB
 let db;
 let pendingSync = 0;
-let lastSyncTime = null;
 
-// -------------------------
-// INDEXEDDB INIT
-// -------------------------
-const request = indexedDB.open("AttendanceDB", 1);
+const request = indexedDB.open("QR_Attendance", 1);
 
-request.onupgradeneeded = function(e) {
+request.onupgradeneeded = e => {
   db = e.target.result;
-
-  db.createObjectStore("attendance", {
-    keyPath: "key",
-    autoIncrement: true
-  });
+  db.createObjectStore("attendance", { keyPath: "id", autoIncrement: true });
 };
 
-request.onsuccess = function(e) {
+request.onsuccess = e => {
   db = e.target.result;
   updateStatus("READY");
 };
 
-// -------------------------
-// SAVE OFFLINE
-// -------------------------
+// -------------------- SAVE OFFLINE
 function saveOffline(record) {
-
   const tx = db.transaction(["attendance"], "readwrite");
-  const store = tx.objectStore("attendance");
-
-  store.add(record);
+  tx.objectStore("attendance").add(record);
 
   pendingSync++;
   updateStatus("PENDING");
 }
 
-// -------------------------
-// SCAN CONTROL
-// -------------------------
+// -------------------- SCAN
 let lastScan = "";
 
-function onScanSuccess(decodedText) {
+function onScanSuccess(text) {
 
-  if (decodedText === lastScan) return;
-  lastScan = decodedText;
+  if (text === lastScan) return;
+  lastScan = text;
 
   const record = {
-    id: decodedText,
-    status: "Present",
+    id: text,
     date: new Date().toISOString(),
     device: deviceId
   };
@@ -123,27 +95,22 @@ function onScanSuccess(decodedText) {
   saveOffline(record);
 
   document.getElementById("result").innerText =
-    "Saved Offline: " + decodedText;
+    "Saved: " + text;
 
   setTimeout(() => lastScan = "", 1500);
 }
 
-// -------------------------
-// SYNC DATA
-// -------------------------
+// -------------------- SYNC
 function syncData() {
 
-  if (!navigator.onLine || !db || pendingSync === 0) {
-    updateStatus("OFFLINE");
-    return;
-  }
+  if (!navigator.onLine || !db || pendingSync === 0) return;
 
   const tx = db.transaction(["attendance"], "readonly");
   const store = tx.objectStore("attendance");
 
   const req = store.getAll();
 
-  req.onsuccess = function() {
+  req.onsuccess = () => {
 
     const data = req.result;
 
@@ -151,9 +118,7 @@ function syncData() {
 
     fetch(SYNC_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     })
     .then(res => res.text())
@@ -161,88 +126,50 @@ function syncData() {
 
       if (res === "SYNC_SUCCESS") {
 
-        const tx2 = db.transaction(["attendance"], "readwrite");
-        const store2 = tx2.objectStore("attendance");
-        store2.clear();
+        db.transaction(["attendance"], "readwrite")
+          .objectStore("attendance")
+          .clear();
 
         pendingSync = 0;
-        lastSyncTime = new Date();
-
         updateStatus("SYNCED");
+      } else {
+        updateStatus("FAILED");
       }
     })
-    .catch(() => {
-      updateStatus("SYNC_FAILED");
-    });
+    .catch(() => updateStatus("FAILED"));
   };
 }
 
-// auto sync every 10 sec
-setInterval(syncData, 10000);
+setInterval(syncData, 8000);
 
-// -------------------------
-// STATUS SYSTEM
-// -------------------------
-function updateStatus(type) {
+// -------------------- STATUS
+function updateStatus(state) {
 
-  const el = document.getElementById("syncStatus");
+  const el = document.getElementById("status");
 
-  if (type === "SYNCED") {
-    el.innerHTML = "🟢 SYNCED<br>Last: " + lastSyncTime.toLocaleTimeString();
-  }
-
-  else if (type === "PENDING") {
-    el.innerHTML = "🟠 PENDING SYNC (" + pendingSync + ")";
-  }
-
-  else if (type === "OFFLINE") {
-    el.innerHTML = "🔴 OFFLINE - Waiting for internet";
-  }
-
-  else if (type === "SYNC_FAILED") {
-    el.innerHTML = "⚠ SYNC FAILED - retrying...";
-  }
-
-  else {
-    el.innerHTML = "SYNC: READY";
-  }
+  if (state === "READY") el.innerText = "🟢 READY";
+  if (state === "PENDING") el.innerText = "🟠 PENDING SYNC";
+  if (state === "SYNCED") el.innerText = "🟢 SYNCED TO SHEETS";
+  if (state === "FAILED") el.innerText = "🔴 SYNC FAILED";
 }
 
-// -------------------------
-// CAMERA (BACK CAMERA PRIORITY)
-// -------------------------
+// -------------------- CAMERA FIX (BACK CAMERA)
 Html5Qrcode.getCameras().then(devices => {
 
-  if (!devices || devices.length === 0) {
-    document.getElementById("result").innerText = "No camera found";
-    return;
-  }
-
-  let backCamera = devices.find(device =>
-    device.label.toLowerCase().includes("back") ||
-    device.label.toLowerCase().includes("rear")
+  const backCam = devices.find(d =>
+    d.label.toLowerCase().includes("back") ||
+    d.label.toLowerCase().includes("rear")
   );
 
-  const cameraId = backCamera ? backCamera.id : devices[0].id;
+  const cameraId = backCam ? backCam.id : devices[0].id;
 
-  const html5QrCode = new Html5Qrcode("reader");
+  const qr = new Html5Qrcode("reader");
 
-  html5QrCode.start(
+  qr.start(
     cameraId,
-    {
-      fps: 8,
-      qrbox: 220,
-      disableFlip: true
-    },
+    { fps: 8, qrbox: 220 },
     onScanSuccess
-  )
-  .then(() => {
-    document.getElementById("result").innerText = "Camera Ready";
-  })
-  .catch(err => {
-    console.error(err);
-    document.getElementById("result").innerText = "Camera Error";
-  });
+  );
 
 });
 </script>
