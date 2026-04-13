@@ -53,7 +53,7 @@ h2 {
 <div id="syncStatus">SYNC: UNKNOWN</div>
 
 <script>
-const SYNC_URL = "https://script.google.com/macros/s/AKfycbz7eKqZ7z-tQQF7dKsFUX-VO684GcHlkPotTB1a7IUWmguSREcXB28h-cpq7oaDS2h_gg/exec";
+const SYNC_URL = "https://script.google.com/macros/s/AKfycbye_LqtGkk5tMJViI2vveWk0JzVnE2jmVxSpw_qxsAmVwFFioM1bnNZf3-bhl4AFC384Q/exec";
 
 // -------------------------
 // DEVICE ID
@@ -114,7 +114,7 @@ function onScanSuccess(decodedText) {
   lastScan = decodedText;
 
   const record = {
-    name: decodedText,
+    id: decodedText,
     status: "Present",
     date: new Date().toISOString(),
     device: deviceId
