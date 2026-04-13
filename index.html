@@ -14,15 +14,15 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  min-height: 92;
+  min-height: 100vh;
   padding: 10px;
 }
 
 h1 {
   margin-bottom: 15px;
   font-size: 28px;
-  letter-spacing: 1px;
   text-align: center;
+  color: white;
 }
 
 #scanner-container {
@@ -48,6 +48,21 @@ h1 {
   pointer-events: none;
 }
 
+/* Scan animation */
+#overlay::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 3px;
+  background: rgba(0,255,0,0.8);
+  animation: scan 2s linear infinite;
+}
+
+@keyframes scan {
+  0% { top: 0; }
+  100% { top: 100%; }
+}
+
 #resultBox {
   position: fixed;
   bottom: 40px;
@@ -56,7 +71,7 @@ h1 {
   text-align: center;
   padding: 25px;
   border-radius: 20px;
-  font-size: 36px;
+  font-size: 32px;
   font-weight: bold;
   display: none;
   animation: pop 0.3s ease;
@@ -78,12 +93,6 @@ h1 {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
-
-@media(max-width: 500px){
-  #resultBox {
-    font-size: 26px;
-  }
-}
 </style>
 </head>
 
@@ -102,7 +111,12 @@ h1 {
 
 <script>
 const webAppUrl = "https://script.google.com/macros/s/AKfycbz7eKqZ7z-tQQF7dKsFUX-VO684GcHlkPotTB1a7IUWmguSREcXB28h-cpq7oaDS2h_gg/exec";
+
 let isProcessing = false;
+let lastScanned = "";
+
+// SOUND FEEDBACK (optional but fast UX)
+const beep = new Audio("https://www.soundjay.com/buttons/sounds/beep-01a.mp3");
 
 function showResult(message, type) {
   const box = document.getElementById("resultBox");
@@ -112,29 +126,34 @@ function showResult(message, type) {
   const lines = message.split("\n");
 
   box.innerHTML = `
-    <div style="font-size:36px;font-weight:bold;">${lines[0]}</div>
-    ${lines[1] ? `<div style="font-size:28px;margin-top:10px;">${lines[1]}</div>` : ""}
+    <div style="font-size:34px;">${lines[0]}</div>
+    ${lines[1] ? `<div style="font-size:24px;margin-top:10px;">${lines[1]}</div>` : ""}
   `;
 
   box.style.display = "block";
 
   setTimeout(() => {
     box.style.display = "none";
-  }, 3000);
+  }, 2500);
 }
 
 function onScanSuccess(decodedText) {
-  if (isProcessing) return;
-  isProcessing = true;
 
-  fetch(webAppUrl + "?id=" + decodedText)
+  if (isProcessing || decodedText === lastScanned) return;
+
+  isProcessing = true;
+  lastScanned = decodedText;
+
+  beep.play(); // instant feedback
+
+  fetch(webAppUrl + "?id=" + decodedText, { cache: "no-store" })
     .then(response => response.text())
     .then(result => {
 
       const lines = result.split("\n");
       const status = lines[0];
       const fullName = lines[1] || "";
-    
+
       if (status === "APPROVED") {
         showResult("✅ APPROVED\n" + fullName, "approved");
       }
@@ -147,31 +166,36 @@ function onScanSuccess(decodedText) {
       else {
         showResult("⚠ SYSTEM ERROR", "error");
       }
-    
+
       setTimeout(() => {
         isProcessing = false;
-      }, 1500);
+        lastScanned = "";
+      }, 1000);
+
     })
-    .catch(error => {
+    .catch(() => {
       showResult("⚠ CONNECTION ERROR", "error");
       isProcessing = false;
+      lastScanned = "";
     });
 }
 
 function onScanFailure(error) {}
 
+// START CAMERA DIRECTLY (FASTER)
 const html5QrCode = new Html5Qrcode("reader");
 
-Html5Qrcode.getCameras().then(devices => {
-  if (devices && devices.length) {
-    html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 20, qrbox: 280 },
-      onScanSuccess,
-      onScanFailure
-    );
-  }
-});
+html5QrCode.start(
+  { facingMode: { exact: "environment" } },
+  {
+    fps: 10,
+    qrbox: { width: 250, height: 250 },
+    aspectRatio: 1.0,
+    disableFlip: true
+  },
+  onScanSuccess,
+  onScanFailure
+);
 </script>
 
 </body>
