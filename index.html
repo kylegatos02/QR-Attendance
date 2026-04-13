@@ -1,186 +1,187 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Event QR Scanner</title>
+<title>Offline QR Attendance</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
 body {
-  margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 100vh;
-  padding: 10px;
-}
-
-h1 {
-  margin-bottom: 15px;
-  font-size: 28px;
+  font-family: Arial;
   text-align: center;
+  background: #1e3c72;
   color: white;
+  margin: 0;
+  padding: 20px;
 }
 
-#scanner-container {
-  position: relative;
-  width: 95vw;
-  max-width: 500px;
-  aspect-ratio: 1 / 1;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+h2 {
+  margin-bottom: 10px;
 }
 
 #reader {
-  width: 100%;
-  height: 100%;
+  width: 320px;
+  margin: auto;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
-#overlay {
-  position: absolute;
-  inset: 0;
-  border: 4px solid rgba(255,255,255,0.6);
-  border-radius: 20px;
-  pointer-events: none;
-}
-
-/* RESULT BOX */
-#resultBox {
-  position: fixed;
-  bottom: 40px;
-  width: 90%;
-  max-width: 500px;
-  text-align: center;
-  padding: 25px;
-  border-radius: 20px;
-  font-size: 32px;
-  font-weight: bold;
-  display: none;
-  animation: pop 0.3s ease;
-}
-
-.approved {
-  background: #00c853;
-  color: white;
-  box-shadow: 0 0 25px rgba(0, 255, 100, 0.8);
-}
-
-.error {
-  background: #d50000;
-  color: white;
-  box-shadow: 0 0 25px rgba(255, 0, 0, 0.8);
-}
-
-@keyframes pop {
-  from { transform: scale(0.8); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+#result {
+  margin-top: 20px;
+  font-size: 18px;
+  padding: 10px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>ATTENDANCE</h1>
+<h2>OFFLINE QR ATTENDANCE</h2>
 
-<div id="scanner-container">
-  <div id="reader"></div>
-  <div id="overlay"></div>
-</div>
-
-<div id="resultBox"></div>
-
-<script src="https://unpkg.com/html5-qrcode"></script>
+<div id="reader"></div>
+<div id="result">Initializing...</div>
 
 <script>
-const webAppUrl = "https://script.google.com/macros/s/AKfycbz7eKqZ7z-tQQF7dKsFUX-VO684GcHlkPotTB1a7IUWmguSREcXB28h-cpq7oaDS2h_gg/exec";
+const SYNC_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
 
-let isProcessing = false;
-let lastScanned = "";
+// -------------------------
+// DEVICE ID
+// -------------------------
+const deviceId = localStorage.getItem("deviceId") ||
+  (crypto.randomUUID ? crypto.randomUUID() : "device-" + Math.random().toString(36).substr(2, 9));
 
-// beep sound
-const beep = new Audio("https://www.soundjay.com/buttons/sounds/beep-01a.mp3");
+localStorage.setItem("deviceId", deviceId);
 
-function showResult(message, type) {
-  const box = document.getElementById("resultBox");
-  box.className = "";
-  box.classList.add(type);
+// -------------------------
+// INDEXEDDB SETUP
+// -------------------------
+let db;
 
-  const lines = message.split("\n");
+const request = indexedDB.open("AttendanceDB", 1);
 
-  box.innerHTML = `
-    <div style="font-size:34px;">${lines[0]}</div>
-    ${lines[1] ? `<div style="font-size:24px;margin-top:10px;">${lines[1]}</div>` : ""}
-  `;
+request.onupgradeneeded = function(e) {
+  db = e.target.result;
 
-  box.style.display = "block";
+  const store = db.createObjectStore("attendance", {
+    keyPath: "key",
+    autoIncrement: true
+  });
+};
 
-  setTimeout(() => {
-    box.style.display = "none";
-  }, 2500);
+request.onsuccess = function(e) {
+  db = e.target.result;
+  document.getElementById("result").innerText = "Scanner Ready";
+};
+
+// -------------------------
+// SAVE OFFLINE
+// -------------------------
+function saveOffline(record) {
+  const tx = db.transaction(["attendance"], "readwrite");
+  const store = tx.objectStore("attendance");
+  store.add(record);
 }
+
+// -------------------------
+// SCAN LOGIC
+// -------------------------
+let lastScan = "";
 
 function onScanSuccess(decodedText) {
 
-  if (isProcessing || decodedText === lastScanned) return;
+  if (decodedText === lastScan) return;
+  lastScan = decodedText;
 
-  isProcessing = true;
-  lastScanned = decodedText;
+  const record = {
+    id: decodedText,
+    status: "Present",
+    date: new Date().toISOString(),
+    device: deviceId
+  };
 
-  beep.play();
+  saveOffline(record);
 
-  fetch(webAppUrl + "?id=" + decodedText, { cache: "no-store" })
-    .then(response => response.text())
-    .then(result => {
+  document.getElementById("result").innerText =
+    "Saved Offline: " + decodedText;
 
-      const lines = result.split("\n");
-      const status = lines[0];
-      const fullName = lines[1] || "";
-
-      if (status === "APPROVED") {
-        showResult("✅ APPROVED\n" + fullName, "approved");
-      }
-      else if (status === "ALREADY_SCANNED") {
-        showResult("⚠ ALREADY SCANNED\n" + fullName, "error");
-      }
-      else if (status === "NOT_FOUND") {
-        showResult("❌ ID NOT FOUND", "error");
-      }
-      else {
-        showResult("⚠ SYSTEM ERROR", "error");
-      }
-
-      setTimeout(() => {
-        isProcessing = false;
-        lastScanned = "";
-      }, 1000);
-
-    })
-    .catch(() => {
-      showResult("⚠ CONNECTION ERROR", "error");
-      isProcessing = false;
-      lastScanned = "";
-    });
+  // reset scan lock
+  setTimeout(() => lastScan = "", 1500);
 }
 
-function onScanFailure(error) {}
+// -------------------------
+// SYNC FUNCTION
+// -------------------------
+function syncData() {
 
-const html5QrCode = new Html5Qrcode("reader");
+  if (!navigator.onLine || !db) return;
 
-html5QrCode.start(
-  { facingMode: { exact: "environment" } },
-  {
-    fps: 10,
-    qrbox: { width: 250, height: 250 },
-    aspectRatio: 1.0,
-    disableFlip: true
-  },
-  onScanSuccess,
-  onScanFailure
-);
+  const tx = db.transaction(["attendance"], "readonly");
+  const store = tx.objectStore("attendance");
+
+  const request = store.getAll();
+
+  request.onsuccess = function() {
+
+    const data = request.result;
+
+    if (!data.length) return;
+
+    fetch(SYNC_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    })
+    .then(res => res.text())
+    .then(res => {
+
+      if (res === "SYNC_SUCCESS") {
+
+        const tx2 = db.transaction(["attendance"], "readwrite");
+        const store2 = tx2.objectStore("attendance");
+        store2.clear();
+
+        console.log("SYNCED SUCCESS");
+      }
+    });
+  };
+}
+
+// auto sync every 10 sec
+setInterval(syncData, 10000);
+
+// -------------------------
+// CAMERA START (FIXED)
+// -------------------------
+Html5Qrcode.getCameras().then(devices => {
+
+  if (devices && devices.length) {
+
+    const cameraId = devices[0].id;
+
+    const html5QrCode = new Html5Qrcode("reader");
+
+    html5QrCode.start(
+      cameraId,
+      {
+        fps: 8,
+        qrbox: 220,
+        disableFlip: true
+      },
+      onScanSuccess
+    );
+
+  } else {
+    document.getElementById("result").innerText = "No camera found";
+  }
+
+}).catch(err => {
+  console.error(err);
+  document.getElementById("result").innerText = "Camera error";
+});
 </script>
 
 </body>
