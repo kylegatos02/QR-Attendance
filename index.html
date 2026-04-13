@@ -123,31 +123,27 @@ function syncData() {
 
     if (!data.length) return;
 
-    fetch(SYNC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
-    })
-    .then(res => res.text())
-    .then(res => {
+   fetch(SYNC_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(data)
+})
+.then(async res => {
 
-      console.log("SYNC RESPONSE:", res);
+  let text = await res.text();
 
-      if (res === "SYNC_SUCCESS") {
+  // 🔥 SHOW EXACT RESPONSE ON SCREEN
+  document.getElementById("status").innerText =
+    "RESPONSE: " + text;
 
-        db.transaction(["attendance"], "readwrite")
-          .objectStore("attendance")
-          .clear();
+})
+.catch(err => {
 
-        pending = 0;
-        setStatus("SYNCED");
+  // 🔥 SHOW NETWORK ERROR
+  document.getElementById("status").innerText =
+    "FETCH ERROR: " + err;
 
-      } else {
-        setStatus("FAILED");
-      }
-    })
-    .catch(() => setStatus("FAILED"));
-  };
+});
 }
 
 setInterval(syncData, 8000);
